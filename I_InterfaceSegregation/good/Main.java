@@ -2,7 +2,6 @@ package I_InterfaceSegregation.good;
 
 public class Main{
 
-    public static void main(String[] args) {
         System.out.println("main");
         Programmer dev = new Programmer();
         Robot bot = new Robot();
