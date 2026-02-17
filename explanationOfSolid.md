@@ -827,26 +827,112 @@ public class Main {
 # 5️⃣ D - Dependency Inversion Principle
 # مبدأ عكس التبعية
 
-## التعريف
+---
 
-> "الكلاسات عالية المستوى لا يجب أن تعتمد على كلاسات منخفضة المستوى. كلاهما يجب أن يعتمد على Abstractions"
+## 📚 المستوى الأول: الأساسيات
 
-بمعنى آخر: اعتمد على Interfaces وليس على Classes مباشرة.
+### ما هو مبدأ عكس التبعية؟
 
-## لماذا هذا المبدأ مهم؟
+مبدأ عكس التبعية (DIP) هو آخر مبدأ في SOLID، وضعه **Robert C. Martin (Uncle Bob)** وينص على قاعدتين أساسيتين:
 
-1. **المرونة**: سهولة تبديل التنفيذات
-2. **الاختبار**: سهولة عمل Mock للاختبار
-3. **فك الارتباط**: تقليل التبعيات بين الكلاسات
+> **القاعدة الأولى:** "الموديولات عالية المستوى (High-level modules) لا يجب أن تعتمد على موديولات منخفضة المستوى (Low-level modules). كلاهما يجب أن يعتمد على التجريدات (Abstractions)"
+
+> **القاعدة الثانية:** "التجريدات (Abstractions) لا يجب أن تعتمد على التفاصيل (Details). التفاصيل يجب أن تعتمد على التجريدات"
+
+### لماذا سمي "عكس" التبعية؟
+
+```
+الطريقة التقليدية (بدون DIP):
+┌─────────────────┐
+│   High Level    │  (مثل: UserService)
+│    Module       │
+└────────┬────────┘
+         │ يعتمد على (depends on)
+         ▼
+┌─────────────────┐
+│   Low Level     │  (مثل: MySQLDatabase)
+│    Module       │
+└─────────────────┘
+
+الطريقة الصحيحة (مع DIP):
+┌─────────────────┐
+│   High Level    │
+│    Module       │
+└────────┬────────┘
+         │ يعتمد على
+         ▼
+┌─────────────────┐
+│   Abstraction   │  (مثل: Database Interface)
+│   (Interface)   │
+└────────▲────────┘
+         │ ينفذ (implements)
+         │
+┌─────────────────┐
+│   Low Level     │
+│    Module       │
+└─────────────────┘
+
+لاحظ: اتجاه التبعية انعكس! Low Level أصبح يعتمد على Abstraction
+```
 
 ---
 
-## المثال السيء (Violates DIP)
+### ما معنى High-Level و Low-Level؟
+
+| النوع | التعريف | أمثلة |
+|-------|---------|-------|
+| **High-Level** | الكلاسات التي تحتوي على Business Logic | `UserService`, `OrderProcessor`, `PaymentHandler` |
+| **Low-Level** | الكلاسات التي تتعامل مع التفاصيل التقنية | `MySQLDatabase`, `EmailSender`, `FileWriter` |
+
+```
+High-Level = "ماذا نفعل" (What)
+Low-Level  = "كيف نفعله" (How)
+
+مثال:
+- UserService يعرف أنه يحتاج "حفظ مستخدم" (What)
+- MySQLDatabase يعرف "كيف يحفظ في MySQL" (How)
+```
+
+---
+
+### ما هو الـ Abstraction (التجريد)؟
+
+التجريد هو **عقد** (Contract) يحدد "ماذا" بدون "كيف":
+
+```java
+// هذا Abstraction - يحدد "ماذا" فقط
+interface Database {
+    void save(String data);    // ماذا: احفظ البيانات
+    String read(int id);       // ماذا: اقرأ البيانات
+    // لا يحدد كيف!
+}
+
+// هذا التفصيل (Detail) - يحدد "كيف"
+class MySQLDatabase implements Database {
+    @Override
+    public void save(String data) {
+        // كيف: استخدم MySQL connector
+        // كيف: افتح اتصال
+        // كيف: نفذ INSERT query
+    }
+}
+```
+
+**أنواع الـ Abstraction في Java:**
+1. **Interface** - الأفضل والأكثر استخداماً
+2. **Abstract Class** - عندما تحتاج كود مشترك
+3. **Base Class** - أقل تفضيلاً
+
+---
+
+## 📚 المستوى الثاني: لماذا نحتاج DIP؟
+
+### المشكلة بدون DIP
 
 **المسار:** `D_DependencyInversion/bad/`
 
 ```java
-// كلاس منخفض المستوى
+// ❌ BAD: كلاس منخفض المستوى
 class MySQLDatabase {
     public void save(String data) {
         System.out.println("Saving to MySQL: " + data);
@@ -857,13 +943,12 @@ class MySQLDatabase {
     }
 }
 
-// BAD: كلاس عالي المستوى يعتمد مباشرة على MySQL
+// ❌ BAD: كلاس عالي المستوى يعتمد مباشرة على التفاصيل
 class UserService {
-    // اعتماد مباشر على كلاس محدد
+    // 🔴 المشكلة هنا: اعتماد مباشر على كلاس محدد
     private MySQLDatabase database = new MySQLDatabase();
 
     public void createUser(String name) {
-        // business logic
         database.save(name);
     }
 
@@ -873,51 +958,493 @@ class UserService {
 }
 ```
 
-### المشاكل:
+### لماذا هذا خطأ؟
 
 ```
-UserService يعتمد مباشرة على MySQLDatabase
-                    |
-تريد تغيير لـ PostgreSQL؟ يجب تعديل UserService!
-                    |
-تريد عمل Unit Test؟ صعب جدا!
-                    |
-ارتباط قوي (Tight Coupling) = كود صعب الصيانة
+┌─────────────────────────────────────────────────────────────┐
+│                    5 مشاكل رئيسية                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ 1️⃣ Tight Coupling (ارتباط قوي)                             │
+│    UserService مربوط بـ MySQLDatabase بشكل صلب              │
+│                                                             │
+│ 2️⃣ صعوبة التغيير                                           │
+│    تغيير DB = تعديل كل الكلاسات التي تستخدمه               │
+│                                                             │
+│ 3️⃣ صعوبة الاختبار (Testing)                                │
+│    لا يمكن اختبار UserService بدون MySQL حقيقي             │
+│                                                             │
+│ 4️⃣ انتهاك Open/Closed Principle                            │
+│    إضافة DB جديد = تعديل الكود الموجود                     │
+│                                                             │
+│ 5️⃣ صعوبة إعادة الاستخدام                                   │
+│    UserService لا يمكن استخدامه مع DB آخر                  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+### سيناريو واقعي للمشكلة
 
 ```java
-// إذا أردت تغيير قاعدة البيانات:
+// الآن: تطبيقك يستخدم MySQL
 class UserService {
-    // يجب تغيير هذا السطر
-    private PostgreSQLDatabase database = new PostgreSQLDatabase();
-    // ويجب التأكد أن كل الدوال متوافقة
+    private MySQLDatabase database = new MySQLDatabase();
 }
+
+class OrderService {
+    private MySQLDatabase database = new MySQLDatabase();
+}
+
+class ProductService {
+    private MySQLDatabase database = new MySQLDatabase();
+}
+
+// بعد 6 شهور: الشركة قررت الانتقال لـ PostgreSQL
+// 😱 يجب تعديل كل الكلاسات!
+
+class UserService {
+    private PostgreSQLDatabase database = new PostgreSQLDatabase(); // تعديل!
+}
+
+class OrderService {
+    private PostgreSQLDatabase database = new PostgreSQLDatabase(); // تعديل!
+}
+
+class ProductService {
+    private PostgreSQLDatabase database = new PostgreSQLDatabase(); // تعديل!
+}
+
+// وإذا كان عندك 50 service؟ 😭
 ```
 
 ---
 
-## المثال الصحيح (Follows DIP)
+## 📚 المستوى الثالث: الحل الصحيح
 
 **المسار:** `D_DependencyInversion/good/`
 
-### 1. إنشاء Abstraction (Interface)
+### الخطوة 1: إنشاء Abstraction
 
 ```java
-// واجهة مجردة لقاعدة البيانات
+// ✅ GOOD: واجهة مجردة - العقد
 interface Database {
     void save(String data);
     String read(int id);
+    void delete(int id);
+    void update(int id, String data);
 }
 ```
 
-### 2. تنفيذات مختلفة
+### الخطوة 2: إنشاء التنفيذات المختلفة
 
 ```java
 // تنفيذ MySQL
 class MySQLDatabase implements Database {
     @Override
     public void save(String data) {
-        System.out.println("Saving to MySQL: " + data);
+        System.out.println("MySQL: INSERT INTO users VALUES('" + data + "')");
+    }
+
+    @Override
+    public String read(int id) {
+        System.out.println("MySQL: SELECT * FROM users WHERE id = " + id);
+        return "User from MySQL";
+    }
+
+    @Override
+    public void delete(int id) {
+        System.out.println("MySQL: DELETE FROM users WHERE id = " + id);
+    }
+
+    @Override
+    public void update(int id, String data) {
+        System.out.println("MySQL: UPDATE users SET name = '" + data + "' WHERE id = " + id);
+    }
+}
+
+// تنفيذ PostgreSQL
+class PostgreSQLDatabase implements Database {
+    @Override
+    public void save(String data) {
+        System.out.println("PostgreSQL: INSERT INTO users VALUES('" + data + "')");
+    }
+
+    @Override
+    public String read(int id) {
+        System.out.println("PostgreSQL: SELECT * FROM users WHERE id = " + id);
+        return "User from PostgreSQL";
+    }
+
+    @Override
+    public void delete(int id) {
+        System.out.println("PostgreSQL: DELETE FROM users WHERE id = " + id);
+    }
+
+    @Override
+    public void update(int id, String data) {
+        System.out.println("PostgreSQL: UPDATE users SET name = '" + data + "' WHERE id = " + id);
+    }
+}
+
+// تنفيذ MongoDB (NoSQL)
+class MongoDatabase implements Database {
+    @Override
+    public void save(String data) {
+        System.out.println("MongoDB: db.users.insertOne({name: '" + data + "'})");
+    }
+
+    @Override
+    public String read(int id) {
+        System.out.println("MongoDB: db.users.findOne({_id: " + id + "})");
+        return "User from MongoDB";
+    }
+
+    @Override
+    public void delete(int id) {
+        System.out.println("MongoDB: db.users.deleteOne({_id: " + id + "})");
+    }
+
+    @Override
+    public void update(int id, String data) {
+        System.out.println("MongoDB: db.users.updateOne({_id: " + id + "}, {$set: {name: '" + data + "'}})");
+    }
+}
+
+// تنفيذ للاختبار - Mock
+class MockDatabase implements Database {
+    private List<String> savedData = new ArrayList<>();
+
+    @Override
+    public void save(String data) {
+        savedData.add(data);
+        System.out.println("[MOCK] Saved: " + data);
+    }
+
+    @Override
+    public String read(int id) {
+        System.out.println("[MOCK] Read id: " + id);
+        return id < savedData.size() ? savedData.get(id) : "Not found";
+    }
+
+    @Override
+    public void delete(int id) {
+        System.out.println("[MOCK] Deleted id: " + id);
+    }
+
+    @Override
+    public void update(int id, String data) {
+        System.out.println("[MOCK] Updated id " + id + " with: " + data);
+    }
+
+    // للاختبار: التحقق من البيانات المحفوظة
+    public List<String> getSavedData() {
+        return savedData;
+    }
+}
+```
+
+### الخطوة 3: High-Level يعتمد على Abstraction
+
+```java
+// ✅ GOOD: يعتمد على Interface وليس كلاس محدد
+class UserService {
+    private final Database database;  // 🟢 Interface!
+
+    // Dependency Injection عبر Constructor
+    public UserService(Database database) {
+        this.database = database;
+    }
+
+    public void createUser(String name) {
+        // Validation logic
+        if (name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("Name cannot be empty");
+        }
+        database.save(name);
+    }
+
+    public String getUser(int id) {
+        return database.read(id);
+    }
+
+    public void deleteUser(int id) {
+        database.delete(id);
+    }
+
+    public void updateUser(int id, String name) {
+        database.update(id, name);
+    }
+}
+```
+
+### الخطوة 4: الاستخدام المرن
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        // ============ Production: استخدام MySQL ============
+        Database mysqlDb = new MySQLDatabase();
+        UserService mysqlService = new UserService(mysqlDb);
+        
+        System.out.println("=== MySQL ===");
+        mysqlService.createUser("Ahmed");
+        mysqlService.getUser(1);
+
+        // ============ Production: تغيير لـ PostgreSQL ============
+        // 🟢 لم نغير UserService على الإطلاق!
+        Database postgresDb = new PostgreSQLDatabase();
+        UserService postgresService = new UserService(postgresDb);
+        
+        System.out.println("\n=== PostgreSQL ===");
+        postgresService.createUser("Mohamed");
+        postgresService.getUser(1);
+
+        // ============ Production: تغيير لـ MongoDB ============
+        // 🟢 لم نغير UserService على الإطلاق!
+        Database mongoDb = new MongoDatabase();
+        UserService mongoService = new UserService(mongoDb);
+        
+        System.out.println("\n=== MongoDB ===");
+        mongoService.createUser("Ali");
+        mongoService.getUser(1);
+
+        // ============ Testing: استخدام Mock ============
+        System.out.println("\n=== Testing with Mock ===");
+        MockDatabase mockDb = new MockDatabase();
+        UserService testService = new UserService(mockDb);
+        
+        testService.createUser("Test User 1");
+        testService.createUser("Test User 2");
+        
+        // التحقق من البيانات للاختبار
+        System.out.println("Saved data: " + mockDb.getSavedData());
+    }
+}
+```
+
+---
+
+## 📚 المستوى الرابع: Dependency Injection بالتفصيل
+
+### ما هو Dependency Injection (DI)؟
+
+Dependency Injection هو **تقنية** لتطبيق DIP، حيث يتم "حقن" التبعيات من الخارج بدلاً من إنشائها داخل الكلاس.
+
+```
+بدون DI:
+class UserService {
+    private Database db = new MySQLDatabase(); // ❌ ينشئها بنفسه
+}
+
+مع DI:
+class UserService {
+    private Database db;
+    public UserService(Database db) { // ✅ تُحقن من الخارج
+        this.db = db;
+    }
+}
+```
+
+### أنواع Dependency Injection
+
+#### 1️⃣ Constructor Injection (الأفضل ✅)
+
+```java
+class UserService {
+    private final Database database;
+    private final EmailService emailService;
+    private final Logger logger;
+
+    // كل التبعيات تُحقن عبر الـ Constructor
+    public UserService(Database database, EmailService emailService, Logger logger) {
+        this.database = database;
+        this.emailService = emailService;
+        this.logger = logger;
+    }
+}
+
+// الاستخدام:
+Database db = new MySQLDatabase();
+EmailService email = new SMTPEmailService();
+Logger logger = new FileLogger();
+
+UserService service = new UserService(db, email, logger);
+```
+
+**مميزات Constructor Injection:**
+- التبعيات واضحة ومرئية
+- الكائن دائماً في حالة صالحة
+- يمكن جعل الـ fields نوع `final`
+- سهل الاختبار
+
+#### 2️⃣ Setter Injection
+
+```java
+class UserService {
+    private Database database;
+    private EmailService emailService;
+
+    // Setter لكل تبعية
+    public void setDatabase(Database database) {
+        this.database = database;
+    }
+
+    public void setEmailService(EmailService emailService) {
+        this.emailService = emailService;
+    }
+}
+
+// الاستخدام:
+UserService service = new UserService();
+service.setDatabase(new MySQLDatabase());
+service.setEmailService(new SMTPEmailService());
+```
+
+**متى تستخدم Setter Injection:**
+- التبعيات اختيارية (Optional)
+- تحتاج تغيير التبعية في Runtime
+
+**⚠️ عيوب:**
+- الكائن قد يكون في حالة غير صالحة
+- لا يمكن جعل الـ fields نوع `final`
+
+#### 3️⃣ Interface Injection (نادر الاستخدام)
+
+```java
+// واجهة للحقن
+interface DatabaseInjectable {
+    void injectDatabase(Database database);
+}
+
+class UserService implements DatabaseInjectable {
+    private Database database;
+
+    @Override
+    public void injectDatabase(Database database) {
+        this.database = database;
+    }
+}
+```
+
+---
+
+## 📚 المستوى الخامس: Inversion of Control (IoC)
+
+### ما هو IoC؟
+
+IoC هو **مبدأ** أعم من DI. يعني أن التحكم في إنشاء الكائنات ينتقل من الكود إلى "حاوية" (Container) خارجية.
+
+```
+بدون IoC (التقليدي):
+┌─────────────────────────────────────────┐
+│              Your Code                  │
+│  ┌─────────────────────────────────┐    │
+│  │ UserService service =           │    │
+│  │   new UserService(              │    │
+│  │     new MySQLDatabase(),        │ ◄── أنت تتحكم في كل شيء
+│  │     new SMTPEmailService()      │    │
+│  │   );                            │    │
+│  └─────────────────────────────────┘    │
+└─────────────────────────────────────────┘
+
+مع IoC:
+┌─────────────────────────────────────────┐
+│            IoC Container                │
+│  ┌─────────────────────────────────┐    │
+│  │ - يعرف كيف ينشئ Database        │    │
+│  │ - يعرف كيف ينشئ EmailService   │ ◄── الـ Container يتحكم
+│  │ - يعرف كيف ينشئ UserService    │    │
+│  │ - يحقن التبعيات تلقائياً       │    │
+│  └─────────────────────────────────┘    │
+└─────────────────────────────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────┐
+│              Your Code                  │
+│  ┌─────────────────────────────────┐    │
+│  │ UserService service =           │    │
+│  │   container.get(UserService);   │ ◄── فقط تطلب ما تحتاجه
+│  └─────────────────────────────────┘    │
+└─────────────────────────────────────────┘
+```
+
+### IoC Container بسيط (يدوي)
+
+```java
+// IoC Container بسيط
+class DIContainer {
+    private Map<Class<?>, Object> instances = new HashMap<>();
+    private Map<Class<?>, Supplier<?>> factories = new HashMap<>();
+
+    // تسجيل كلاس مع instance
+    public <T> void registerInstance(Class<T> type, T instance) {
+        instances.put(type, instance);
+    }
+
+    // تسجيل كلاس مع factory
+    public <T> void registerFactory(Class<T> type, Supplier<T> factory) {
+        factories.put(type, factory);
+    }
+
+    // الحصول على instance
+    @SuppressWarnings("unchecked")
+    public <T> T resolve(Class<T> type) {
+        if (instances.containsKey(type)) {
+            return (T) instances.get(type);
+        }
+        if (factories.containsKey(type)) {
+            return (T) factories.get(type).get();
+        }
+        throw new RuntimeException("Type not registered: " + type.getName());
+    }
+}
+
+// الاستخدام:
+public class Main {
+    public static void main(String[] args) {
+        DIContainer container = new DIContainer();
+
+        // تسجيل التبعيات
+        container.registerInstance(Database.class, new MySQLDatabase());
+        container.registerInstance(EmailService.class, new SMTPEmailService());
+        container.registerInstance(Logger.class, new ConsoleLogger());
+
+        // تسجيل UserService مع factory
+        container.registerFactory(UserService.class, () -> {
+            return new UserService(
+                container.resolve(Database.class),
+                container.resolve(EmailService.class),
+                container.resolve(Logger.class)
+            );
+        });
+
+        // الاستخدام - لا تحتاج معرفة التفاصيل!
+        UserService userService = container.resolve(UserService.class);
+        userService.createUser("Ahmed");
+    }
+}
+```
+
+---
+
+## 📚 المستوى السادس: DIP في الـ Frameworks
+
+### Spring Framework (Java الأشهر)
+
+```java
+// 1. تعريف Interface
+public interface Database {
+    void save(String data);
+    String read(int id);
+}
+
+// 2. تنفيذ مع @Component
+@Component
+@Primary  // هذا هو التنفيذ الافتراضي
+public class MySQLDatabase implements Database {
+    @Override
+    public void save(String data) {
+        System.out.println("MySQL: Saving " + data);
     }
 
     @Override
@@ -926,11 +1453,12 @@ class MySQLDatabase implements Database {
     }
 }
 
-// تنفيذ PostgreSQL
-class PostgreSQLDatabase implements Database {
+@Component
+@Qualifier("postgres")
+public class PostgreSQLDatabase implements Database {
     @Override
     public void save(String data) {
-        System.out.println("Saving to PostgreSQL: " + data);
+        System.out.println("PostgreSQL: Saving " + data);
     }
 
     @Override
@@ -939,101 +1467,509 @@ class PostgreSQLDatabase implements Database {
     }
 }
 
-// تنفيذ MongoDB
-class MongoDBDatabase implements Database {
-    @Override
-    public void save(String data) {
-        System.out.println("Saving to MongoDB: " + data);
-    }
+// 3. حقن التبعية تلقائياً
+@Service
+public class UserService {
+    private final Database database;
 
-    @Override
-    public String read(int id) {
-        return "Data from MongoDB";
-    }
-}
-
-// تنفيذ للاختبار
-class MockDatabase implements Database {
-    @Override
-    public void save(String data) {
-        System.out.println("[TEST] Mock save: " + data);
-    }
-
-    @Override
-    public String read(int id) {
-        return "[TEST] Mock data";
-    }
-}
-```
-
-### 3. الكلاس عالي المستوى يعتمد على Interface
-
-```java
-// GOOD: يعتمد على Interface وليس كلاس محدد
-class UserService {
-    private Database database;  // Interface!
-
-    // Dependency Injection عبر Constructor
+    @Autowired  // Spring يحقن تلقائياً!
     public UserService(Database database) {
         this.database = database;
     }
 
     public void createUser(String name) {
-        // business logic
         database.save(name);
     }
+}
 
-    public String getUser(int id) {
-        return database.read(id);
+// 4. لاستخدام تنفيذ محدد:
+@Service
+public class AdminService {
+    private final Database database;
+
+    @Autowired
+    public AdminService(@Qualifier("postgres") Database database) {
+        this.database = database;
     }
 }
 ```
 
-### 4. الاستخدام - المرونة الكاملة
+### كيف يعمل Spring؟
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                    Spring IoC Container                    │
+│                                                            │
+│  1. يفحص كل الكلاسات مع @Component, @Service, etc         │
+│  2. يبني خريطة التبعيات                                    │
+│  3. عند طلب Bean، ينشئه ويحقن كل تبعياته                  │
+│                                                            │
+│  ┌──────────────────────────────────────────────────┐     │
+│  │ Beans:                                            │     │
+│  │   MySQLDatabase     → Database.class             │     │
+│  │   PostgreSQLDatabase → "postgres"                │     │
+│  │   UserService       → (needs Database)           │     │
+│  │   AdminService      → (needs "postgres")         │     │
+│  └──────────────────────────────────────────────────┘     │
+└────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📚 المستوى السابع: أمثلة متقدمة
+
+### مثال 1: نظام إشعارات متعدد القنوات
 
 ```java
+// Abstraction للإشعارات
+interface NotificationService {
+    void send(String userId, String message);
+    boolean supports(NotificationType type);
+}
+
+enum NotificationType {
+    EMAIL, SMS, PUSH, SLACK
+}
+
+// تنفيذات مختلفة
+class EmailNotificationService implements NotificationService {
+    @Override
+    public void send(String userId, String message) {
+        System.out.println("📧 Sending email to " + userId + ": " + message);
+    }
+
+    @Override
+    public boolean supports(NotificationType type) {
+        return type == NotificationType.EMAIL;
+    }
+}
+
+class SMSNotificationService implements NotificationService {
+    @Override
+    public void send(String userId, String message) {
+        System.out.println("📱 Sending SMS to " + userId + ": " + message);
+    }
+
+    @Override
+    public boolean supports(NotificationType type) {
+        return type == NotificationType.SMS;
+    }
+}
+
+class PushNotificationService implements NotificationService {
+    @Override
+    public void send(String userId, String message) {
+        System.out.println("🔔 Sending push to " + userId + ": " + message);
+    }
+
+    @Override
+    public boolean supports(NotificationType type) {
+        return type == NotificationType.PUSH;
+    }
+}
+
+class SlackNotificationService implements NotificationService {
+    @Override
+    public void send(String userId, String message) {
+        System.out.println("💬 Sending Slack to " + userId + ": " + message);
+    }
+
+    @Override
+    public boolean supports(NotificationType type) {
+        return type == NotificationType.SLACK;
+    }
+}
+
+// High-level module يستخدم كل الإشعارات
+class NotificationManager {
+    private final List<NotificationService> services;
+
+    public NotificationManager(List<NotificationService> services) {
+        this.services = services;
+    }
+
+    public void notifyUser(String userId, String message, NotificationType... types) {
+        for (NotificationType type : types) {
+            services.stream()
+                .filter(s -> s.supports(type))
+                .forEach(s -> s.send(userId, message));
+        }
+    }
+
+    public void notifyAll(String userId, String message) {
+        services.forEach(s -> s.send(userId, message));
+    }
+}
+
+// الاستخدام:
 public class Main {
     public static void main(String[] args) {
-        // استخدام MySQL
-        Database mysql = new MySQLDatabase();
-        UserService service1 = new UserService(mysql);
-        service1.createUser("Ahmed");
+        List<NotificationService> services = Arrays.asList(
+            new EmailNotificationService(),
+            new SMSNotificationService(),
+            new PushNotificationService(),
+            new SlackNotificationService()
+        );
 
-        // تغيير لـ PostgreSQL - بدون تعديل UserService!
-        Database postgres = new PostgreSQLDatabase();
-        UserService service2 = new UserService(postgres);
-        service2.createUser("Mohamed");
+        NotificationManager manager = new NotificationManager(services);
 
-        // تغيير لـ MongoDB - بدون تعديل UserService!
-        Database mongo = new MongoDBDatabase();
-        UserService service3 = new UserService(mongo);
-        service3.createUser("Ali");
+        // إرسال بالبريد والـ SMS فقط
+        manager.notifyUser("user123", "Your order is ready!", 
+            NotificationType.EMAIL, NotificationType.SMS);
 
-        // للاختبار - سهل جدا!
-        Database mockDb = new MockDatabase();
-        UserService testService = new UserService(mockDb);
-        testService.createUser("Test User");
+        // إرسال بكل القنوات
+        manager.notifyAll("admin", "System alert!");
     }
 }
 ```
 
-### الفرق:
+### مثال 2: نظام دفع متعدد البوابات
+
+```java
+// Abstraction للدفع
+interface PaymentGateway {
+    PaymentResult processPayment(PaymentRequest request);
+    boolean supportsCard(String cardType);
+    String getGatewayName();
+}
+
+class PaymentRequest {
+    String cardNumber;
+    double amount;
+    String currency;
+    String cardType; // VISA, MASTERCARD, AMEX
+}
+
+class PaymentResult {
+    boolean success;
+    String transactionId;
+    String errorMessage;
+}
+
+// تنفيذات مختلفة
+class StripeGateway implements PaymentGateway {
+    @Override
+    public PaymentResult processPayment(PaymentRequest request) {
+        System.out.println("Processing via Stripe: $" + request.amount);
+        PaymentResult result = new PaymentResult();
+        result.success = true;
+        result.transactionId = "STRIPE_" + System.currentTimeMillis();
+        return result;
+    }
+
+    @Override
+    public boolean supportsCard(String cardType) {
+        return Arrays.asList("VISA", "MASTERCARD").contains(cardType);
+    }
+
+    @Override
+    public String getGatewayName() { return "Stripe"; }
+}
+
+class PayPalGateway implements PaymentGateway {
+    @Override
+    public PaymentResult processPayment(PaymentRequest request) {
+        System.out.println("Processing via PayPal: $" + request.amount);
+        PaymentResult result = new PaymentResult();
+        result.success = true;
+        result.transactionId = "PAYPAL_" + System.currentTimeMillis();
+        return result;
+    }
+
+    @Override
+    public boolean supportsCard(String cardType) {
+        return true; // PayPal يدعم الكل
+    }
+
+    @Override
+    public String getGatewayName() { return "PayPal"; }
+}
+
+// Payment Processor - High Level
+class PaymentProcessor {
+    private final List<PaymentGateway> gateways;
+    private final Logger logger;
+
+    public PaymentProcessor(List<PaymentGateway> gateways, Logger logger) {
+        this.gateways = gateways;
+        this.logger = logger;
+    }
+
+    public PaymentResult pay(PaymentRequest request) {
+        // اختر البوابة المناسبة
+        PaymentGateway gateway = gateways.stream()
+            .filter(g -> g.supportsCard(request.cardType))
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("No gateway supports " + request.cardType));
+
+        logger.info("Using gateway: " + gateway.getGatewayName());
+
+        // نفذ الدفع
+        PaymentResult result = gateway.processPayment(request);
+
+        // سجل النتيجة
+        if (result.success) {
+            logger.info("Payment successful: " + result.transactionId);
+        } else {
+            logger.error("Payment failed: " + result.errorMessage);
+        }
+
+        return result;
+    }
+}
+```
+
+---
+
+## 📚 المستوى الثامن: أفضل الممارسات والأخطاء الشائعة
+
+### ✅ أفضل الممارسات
+
+```java
+// 1. ✅ استخدم Constructor Injection
+class UserService {
+    private final Database database; // final!
+
+    public UserService(Database database) {
+        this.database = database;
+    }
+}
+
+// 2. ✅ البرمجة للـ Interface وليس Implementation
+private final Database database;  // ✅ Interface
+// private final MySQLDatabase database; // ❌ Implementation
+
+// 3. ✅ Interface في package منفصل
+// com.myapp.domain.ports.Database        (Interface)
+// com.myapp.infrastructure.MySQLDatabase (Implementation)
+
+// 4. ✅ Abstraction يملكها High-level module
+// Database interface يكون مع UserService
+// وليس مع MySQLDatabase
+
+// 5. ✅ اسم Interface يعبر عن "ماذا" وليس "كيف"
+interface UserRepository { }     // ✅ ماذا نريد
+interface MySQLUserRepository { } // ❌ كيف ننفذ
+```
+
+### ❌ الأخطاء الشائعة
+
+```java
+// 1. ❌ إنشاء Interface لكل شيء
+interface StringUtils { }  // ❌ لا حاجة له - لن يتغير
+
+// 2. ❌ Interface يعكس Implementation
+interface IMySQLDatabase { }  // ❌ الاسم يحدد التنفيذ
+
+// 3. ❌ استخدام new داخل الكلاس
+class UserService {
+    private Database db;
+
+    public void doSomething() {
+        this.db = new MySQLDatabase(); // ❌ يجب الحقن
+    }
+}
+
+// 4. ❌ Service Locator Pattern (Anti-pattern)
+class UserService {
+    public void doSomething() {
+        Database db = ServiceLocator.get(Database.class); // ❌
+    }
+}
+
+// 5. ❌ Circular Dependency
+class A {
+    public A(B b) { }  // A يحتاج B
+}
+class B {
+    public B(A a) { }  // B يحتاج A - دائرة!
+}
+```
+
+---
+
+## 📚 المستوى التاسع: فوائد الاختبار
+
+### بدون DIP - صعب الاختبار
+
+```java
+// ❌ صعب الاختبار
+class UserService {
+    private MySQLDatabase db = new MySQLDatabase();
+
+    public void createUser(String name) {
+        db.save(name);
+    }
+}
+
+// الاختبار يحتاج MySQL حقيقي! 😱
+@Test
+void testCreateUser() {
+    UserService service = new UserService();
+    service.createUser("Test"); // يحفظ فعلياً في DB!
+}
+```
+
+### مع DIP - سهل الاختبار
+
+```java
+// ✅ سهل الاختبار
+class UserService {
+    private final Database database;
+
+    public UserService(Database database) {
+        this.database = database;
+    }
+
+    public void createUser(String name) {
+        if (name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("Name required");
+        }
+        database.save(name);
+    }
+}
+
+// الاختبار مع Mock
+@Test
+void testCreateUser_Success() {
+    // Arrange
+    MockDatabase mockDb = new MockDatabase();
+    UserService service = new UserService(mockDb);
+
+    // Act
+    service.createUser("Ahmed");
+
+    // Assert
+    assertTrue(mockDb.getSavedData().contains("Ahmed"));
+}
+
+@Test
+void testCreateUser_EmptyName_ThrowsException() {
+    MockDatabase mockDb = new MockDatabase();
+    UserService service = new UserService(mockDb);
+
+    assertThrows(IllegalArgumentException.class, () -> {
+        service.createUser("");
+    });
+}
+
+// مع Mockito
+@Test
+void testCreateUser_WithMockito() {
+    // Arrange
+    Database mockDb = Mockito.mock(Database.class);
+    UserService service = new UserService(mockDb);
+
+    // Act
+    service.createUser("Ahmed");
+
+    // Assert
+    Mockito.verify(mockDb).save("Ahmed");
+}
+```
+
+---
+
+## 📚 المستوى العاشر: متى لا تستخدم DIP؟
+
+### حالات لا تحتاج فيها DIP:
+
+```java
+// 1. ✅ Utility Classes - لن تتغير أبداً
+String.valueOf(123);           // لا تحتاج Interface
+Math.max(a, b);                // لا تحتاج Interface
+Collections.sort(list);        // لا تحتاج Interface
+
+// 2. ✅ Value Objects - بيانات بسيطة
+class Money {
+    private BigDecimal amount;
+    private String currency;
+}
+
+// 3. ✅ DTOs - نقل البيانات فقط
+class UserDTO {
+    String name;
+    String email;
+}
+
+// 4. ✅ Entities بسيطة
+class User {
+    private String id;
+    private String name;
+
+    public void updateName(String name) {
+        this.name = name;
+    }
+}
+
+// 5. ✅ كلاسات لن تتغير
+// إذا كنت متأكد 100% أن التنفيذ لن يتغير
+// وليس هناك حاجة للاختبار المنفصل
+```
+
+### القاعدة الذهبية:
 
 ```
-قبل (بدون DIP):
-UserService -----------------> MySQLDatabase
-     |
-     +-- تغيير DB = تعديل UserService
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│   استخدم DIP عندما:                                         │
+│   ✓ التنفيذ قد يتغير (Database, API, Service)              │
+│   ✓ تحتاج Unit Testing                                     │
+│   ✓ تريد فصل Business Logic عن Technical Details           │
+│                                                             │
+│   لا تستخدم DIP عندما:                                      │
+│   ✗ Utilities و Math operations                            │
+│   ✗ Value Objects و DTOs                                   │
+│   ✗ كلاسات بسيطة لن تتغير أبداً                             │
+│                                                             │
+│   التوازن هو المفتاح!                                       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
 
-بعد (مع DIP):
-UserService -----------------> Database (Interface)
-                                    ^
-                                    |
-         +--------------------------+--------------------------+
-         |                          |                          |
-    MySQLDatabase          PostgreSQLDatabase          MongoDBDatabase
-         |
-         +-- تغيير DB = فقط أنشئ instance جديد!
+---
+
+## الرسم البياني النهائي
+
+```
+                    ┌──────────────────────────────────────┐
+                    │        Dependency Inversion          │
+                    │           Principle (DIP)            │
+                    └──────────────────────────────────────┘
+                                     │
+           ┌─────────────────────────┼─────────────────────────┐
+           │                         │                         │
+           ▼                         ▼                         ▼
+    ┌──────────────┐         ┌──────────────┐         ┌──────────────┐
+    │  القاعدة 1   │         │  القاعدة 2   │         │   الفائدة    │
+    │              │         │              │         │              │
+    │ High-Level   │         │ Abstractions │         │ Loose        │
+    │ لا يعتمد على │         │ لا تعتمد على │         │ Coupling     │
+    │ Low-Level    │         │ Details      │         │              │
+    └──────────────┘         └──────────────┘         └──────────────┘
+           │                         │                         │
+           └─────────────────────────┼─────────────────────────┘
+                                     │
+                                     ▼
+                    ┌──────────────────────────────────────┐
+                    │        Dependency Injection          │
+                    │           (التقنية)                  │
+                    └──────────────────────────────────────┘
+                                     │
+           ┌─────────────────────────┼─────────────────────────┐
+           │                         │                         │
+           ▼                         ▼                         ▼
+    ┌──────────────┐         ┌──────────────┐         ┌──────────────┐
+    │ Constructor  │         │   Setter     │         │  Interface   │
+    │  Injection   │         │  Injection   │         │  Injection   │
+    │   (الأفضل)   │         │ (اختياري)   │         │   (نادر)     │
+    └──────────────┘         └──────────────┘         └──────────────┘
+                                     │
+                                     ▼
+                    ┌──────────────────────────────────────┐
+                    │       IoC Container (اختياري)        │
+                    │   Spring, Guice, Dagger, etc.       │
+                    └──────────────────────────────────────┘
 ```
 
 ---
